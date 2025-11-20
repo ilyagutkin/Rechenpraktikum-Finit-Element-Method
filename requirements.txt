@@ -13,6 +13,9 @@ matplotlib
 ipywidgets
 ipympl
 pytest
+ngsolve
+netgen 
+pyvista
 #manim
 
 # testing dependencies
