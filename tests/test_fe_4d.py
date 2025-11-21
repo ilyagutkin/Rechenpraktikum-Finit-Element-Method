@@ -14,18 +14,18 @@ def random_point():
 def quadratic_polynomials():
     polys = []
 
-    # konstante
+    #constant
     polys.append(lambda x: 1)
 
-    # lineare
+    # linear
     for i in range(4):
         polys.append(lambda x, i=i: x[i])
 
-    # quadratische
+    # quadratic
     for i in range(4):
         polys.append(lambda x, i=i: x[i] * x[i])
 
-    # Kreuzterme
+    # crossterms
     for i in range(4):
         for j in range(i+1, 4):
             polys.append(lambda x, i=i, j=j: x[i] * x[j])
@@ -35,21 +35,21 @@ def quadratic_polynomials():
 def quadratic_polynomials_with_grads():
     polys = []
 
-    # konstante
+    # constant
     polys.append((lambda x: 1.0,
                   lambda x: np.zeros(4)))
 
-    # lineare
+    # linear
     for i in range(4):
         polys.append((lambda x, i=i: x[i],
                       lambda x, i=i: np.eye(4)[i]))
 
-    # quadratische
+    # quadratic
     for i in range(4):
         polys.append((lambda x, i=i: x[i] * x[i],
                       lambda x, i=i: np.array([2*x[i] if j==i else 0 for j in range(4)])))
 
-    # Kreuzterme
+    # crossterms
     for i in range(4):
         for j in range(i+1,4):
             polys.append((
@@ -67,10 +67,10 @@ def quadratic_polynomials_with_grads():
 def linear_polynomials():
     polys = []
 
-    # konstante
+    # constant
     polys.append(lambda x: 1.0)
 
-    # lineare Terme
+    # linear Terms
     for i in range(4):
         polys.append(lambda x, i=i: x[i])
 
@@ -113,24 +113,19 @@ def test_gradients_sum_zero(i):
 def test_P2_reproduces_polynomials(poly):
     fe = P2_Hypertriangle_FE()
 
-    # alle P2-Knoten
-    nodes = fe.nodes             # Liste von 15 Punkten in R^4
+    nodes = fe.nodes             # List of 15 points in R^4
     ndof = fe.ndof
 
-    # Werte des Polynoms an allen Knoten
+    # values of the Polynom at the vertices
     nodal_values = np.array([poly(p) for p in nodes])
-
-    # wähle zufälligen Testpunkt
     x = random_point()
 
     # FE-Interpolation: u_h(x) = sum phi_i(x) * u(node_i)
     phi = fe._evaluate_id(x)
     u_h = np.dot(phi, nodal_values)
 
-    # exakter Wert
     u_exact = poly(x)
 
-    # Vergleich
     assert abs(u_h - u_exact) < 1e-14
 
 
@@ -138,7 +133,6 @@ def test_P2_reproduces_polynomials(poly):
 def test_P2_derivative_reproduction(poly, grad):
     fe = P2_Hypertriangle_FE()
 
-    # Knotenkoordinaten des P2-Elements (15 Stück)
     nodes = fe.nodes
     ndof = fe.ndof
 
@@ -155,7 +149,7 @@ def test_P2_derivative_reproduction(poly, grad):
 
 # Tests for the P1 element
 # -------------------------------------------------------------------------
-# 1. Partition of Unity (gilt exakt für P1)
+# 1. Partition of Unity (exact for P1)
 # -------------------------------------------------------------------------
 @pytest.mark.parametrize("i", range(20))
 def P1test_partition_of_unity(i):
@@ -166,7 +160,7 @@ def P1test_partition_of_unity(i):
 
 
 # -------------------------------------------------------------------------
-# 2. Nicht-Negativität (bei P1 stimmt das!)
+# 2. Non-negative (True for P1!)
 # -------------------------------------------------------------------------
 @pytest.mark.parametrize("i", range(20))
 def P1test_shape_nonnegative(i):
@@ -177,7 +171,7 @@ def P1test_shape_nonnegative(i):
 
 
 # -------------------------------------------------------------------------
-# 3. Gradientenform: (4, ndof) = (4, 5)
+# 3. Gradientshape: (4, ndof) = (4, 5)
 # -------------------------------------------------------------------------
 def P1test_gradient_dimensions():
     fe = P1_Hypertriangle_FE()
@@ -187,7 +181,7 @@ def P1test_gradient_dimensions():
 
 
 # -------------------------------------------------------------------------
-# 4. Gradienten-Summe = 0 (Ableitung der Partition)
+# 4. Gradient-sum = 0 
 # -------------------------------------------------------------------------
 @pytest.mark.parametrize("i", range(10))
 def P1test_gradient_sum_zero(i):
@@ -198,7 +192,7 @@ def P1test_gradient_sum_zero(i):
 
 
 # -------------------------------------------------------------------------
-# 5. Lineare Reproduktion: P1 muss das perfekt können
+# 5. Linear Reproduction: P1 muss be exact
 # -------------------------------------------------------------------------
 @pytest.mark.parametrize("i", range(20))
 def P1test_reproduce_linear_function(i):
@@ -206,7 +200,6 @@ def P1test_reproduce_linear_function(i):
     x = random_point()
     phi = fe._evaluate_id(x)
 
-    # deine Standard-Simplex-Vertices:
     V = np.array([
         [0,0,0,0],  # λ0
         [1,0,0,0],  # λ1
@@ -215,7 +208,6 @@ def P1test_reproduce_linear_function(i):
         [0,0,0,1],  # λ4
     ])
 
-    # Rekonstruktion (baryzentrische Koordinaten)
     x_rec = np.zeros(4)
     for i in range(5):
         x_rec += phi[i] * V[i]
@@ -227,22 +219,18 @@ def P1test_reproduce_linear_function(i):
 def test_P1_reproduces_polynomials(poly):
     fe = P1_Hypertriangle_FE()
 
-    nodes = fe.nodes      # 5 Knoten des P1-Elements
+    nodes = fe.nodes      
     ndof = fe.ndof
 
-    # Polynomwerte an den Elementknoten
     nodal_values = np.array([poly(p) for p in nodes])
 
-    # Testpunkt
     x = random_point()
 
     phi = fe._evaluate_id(x)
     u_h = np.dot(phi, nodal_values)
 
-    # exakter Wert
     u_exact = poly(x)
 
-    # Vergleich
     assert abs(u_h - u_exact) < 1e-14
 
 # ===================== BEGIN DERIVATIVE TESTS P1_HYPERTRIANGLE_FE =====================
@@ -253,12 +241,9 @@ def linear_polynomials_4d_with_grads():
     Ein P1-Simplex muss diese exakt reproduzieren.
     """
     polys = []
-
-    # konstante Funktion
     polys.append((lambda x: 1.0,
                   lambda x: np.zeros(4)))
 
-    # lineare Koordinatenfunktionen
     for i in range(4):
         polys.append(
             (lambda x, i=i: x[i],
@@ -272,12 +257,9 @@ def linear_polynomials_4d_with_grads():
 def test_p1_hypertriangle_derivative_reproduction(poly, grad):
     fe = P1_Hypertriangle_FE()
 
-    # 5 P1-Knoten des 4D-Simplex (das Referenzelement)
     nodes = fe.nodes
     nodal_vals = np.array([poly(p) for p in nodes])
 
-    # wähle einen Punkt im Simplex
-    # → baryzentrische Koordinaten
     lamb = np.random.rand(5)
     lamb = lamb / np.sum(lamb)
     x = np.sum(lamb[:,None] * nodes, axis=0)
@@ -301,7 +283,7 @@ def test_p1_hypertriangle_derivative_reproduction(poly, grad):
 @pytest.mark.parametrize("i", range(20))
 def test_p1_tesserakt_partition_of_unity(i):
     fe = P1_Tesserakt_FE()
-    x = np.random.rand(4)   # hypercube hat kein simplex constraint
+    x = np.random.rand(4)   
     phi = fe._evaluate_id(x)
     assert abs(np.sum(phi) - 1.0) < 1e-14
 
@@ -346,19 +328,14 @@ def separable_linear_polynomials():
 def test_p1_tesserakt_reproduce_separable_linear(poly):
     fe = P1_Tesserakt_FE()
 
-    # 16 Hyperwürfel-Knoten
     nodes = fe.nodes
     nodal_vals = np.array([poly(p) for p in nodes])
 
-    # Zufälliger Punkt im Hyperwürfel
     x = np.random.rand(4)
 
-    # Interpolation: u_h(x) = sum phi_i(x) * u(v_i)
     phi = fe._evaluate_id(x)
     u_h = np.dot(phi, nodal_vals)
 
-    # Exakter Wert
     u_exact = poly(x)
 
-    # Vergleich (Q1 ist exakt für separierbare lineare Funktionen)
     assert abs(u_h - u_exact) < 1e-14

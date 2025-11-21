@@ -11,7 +11,7 @@ class Mesh(ABC):
     volumes = None
     hypercells = None
 
-    hepercells2volumes = None
+    hypercells2volumes = None
     volumes2faces = None
     face2edges = None
 

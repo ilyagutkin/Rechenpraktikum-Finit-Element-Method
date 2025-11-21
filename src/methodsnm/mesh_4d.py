@@ -235,6 +235,7 @@ class UnstructuredHypertriangleMesh(Mesh4D):
         """
         # concise docstring above; implementation unchanged
         edge_set = set()
+        self.hypercell2edge =[]
 
         for cell in self.hypercells:
             v0, v1, v2, v3, v4 = cell
@@ -244,10 +245,28 @@ class UnstructuredHypertriangleMesh(Mesh4D):
                 (v2, v3), (v2, v4),
                 (v3, v4),
             ]
+            self.hypercell2edge.append(edges_local)
             for e in edges_local:
                 edge_set.add(tuple(sorted(e)))
 
-        self.edges = np.array(sorted(edge_set), dtype=int)
+        self.edges = np.array(sorted(edge_set), dtype=int)   
+        self.edge_to_index = {tuple(edge): i for i, edge in enumerate(self.edges)}
+    
+    def index_of_edge(self, a):
+        """
+        Gives the corresponding number to the edge
+        """
+        if isinstance(a, (list, tuple)) and isinstance(a[0], (list, tuple)):
+            lis = []
+            for p in a:
+                key = tuple(sorted(p))  # LIST → SORT → TUPLE
+                lis.append(self.edge_to_index[key])
+            return lis
+
+        key = tuple(sorted(a))
+        return self.edge_to_index[key]
+
+
 
     def _build_p2_dofs(self):
         """

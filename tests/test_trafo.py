@@ -7,7 +7,9 @@ from netgen.csg import unit_cube
 from ngsolve import Mesh,VOL,specialcf
 
 def manual_simplex_volume(pts):
-    """Volumen des 4D-Simplex anhand der Formel |det|/24."""
+    """
+    Volume of the integral should be |det|/24.
+    """
     a = pts[0]
     M = np.column_stack([pts[i] - a for i in range(1,5)])
     return abs(np.linalg.det(M)) / 24.0
@@ -21,7 +23,9 @@ def mesh4d():
 
 
 def test_jacobian_volume(mesh4d):
-    """Testet, ob Trafo das Simplexvolumen korrekt zurückliefert."""
+    """
+    Test if Trafo returns the simplex element
+    """
     el = 0
     trafo = mesh4d.trafo(el)
 
@@ -34,11 +38,8 @@ def test_affine_mapping(mesh4d):
     el = 0
     trafo = mesh4d.trafo(el)
     verts = mesh4d.points[mesh4d.elements()[el]]
-
-    # wähle Referenzkoordinaten (nicht baryzentrisch!)
     eps = np.random.rand(4)
 
-    # Erwarteter Punkt (korrekte Formel!)
     a, b, c, d, e = verts
     expected = (a
                 + eps[0] * (b - a)

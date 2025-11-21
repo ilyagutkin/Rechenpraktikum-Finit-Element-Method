@@ -26,14 +26,9 @@ def test_L2_zero_for_linear_function():
 
     fes = DummyFES(mesh, fe)
 
-    # exakte lineare Funktion
     f_exact = lambda x: 1 + x[0] - 2*x[1] + 0.5*x[2] + 3*x[3]
-
-    # uh ist Absolut korrekt (Interpolation)
     uh = FEFunction(fes)
     uh._set(f_exact)
-
-    # exakte Lösung
     uex = GlobalFunction(f_exact, mesh)
 
     err = compute_difference_L2(uh, uex, mesh)

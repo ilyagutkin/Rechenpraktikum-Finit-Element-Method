@@ -65,7 +65,7 @@ def test_P1_Hypertriangle_dofs_per_element(mesh):
 
 def test_fespace_boundary_sets_consistent(mesh):
     """
-    Testet, dass sich der Rand korrekt in three disjoint pieces zerlegt:
+    Testing if the boundary decomposes in three disjoint pieces:
     boundary = initial ∪ top ∪ side
     """
     fes = P1_Hypertriangle_Space(mesh)
@@ -87,23 +87,15 @@ def test_P2_Hypertriangle_element_dofs_structure(mesh):
     for elnr, verts in enumerate(mesh.elements()):
         dofs = fes.element_dofs(elnr)
 
-        # Länge muss 15 sein
         assert len(dofs) == 15
-
-        # Erste 5 = Vertices
         assert np.allclose(dofs[:5], verts)
-
-        # Letzte 10 = edge DOFs → müssen >= nv sein
         edge_dofs = dofs[5:]
         assert np.all(edge_dofs >= fes.nv)
-
-        # Keine Duplikate
         assert len(set(dofs)) == 15
 
 def test_P2_Hypertriangle_edge_connectivity(mesh):
     fes = P2_Hypertriangle_Space(mesh)
 
-    # Alle globalen Edges sollten in mesh.edges liegen
     global_edges = set(tuple(sorted(e)) for e in mesh.edges)
 
     for elnr, verts in enumerate(mesh.elements()):
@@ -120,11 +112,10 @@ def test_P2_Hypertriangle_boundary_dofs(mesh):
     Bv = fes.boundary_vertices()
     bdofs = fes.boundary_dofs()
 
-    # Vertex DOFs müssen enthalten sein
     for v in Bv:
         assert v in bdofs
 
-    # Edge DOFs müssen enthalten sein, wenn beide Vertices boundary sind
+    # Edge DOFs must be circumcised by Vertices on the boundary 
     for eid, (v1, v2) in enumerate(mesh.edges):
         if v1 in Bv and v2 in Bv:
             assert fes.nv + eid in bdofs
@@ -170,12 +161,10 @@ def test_P2_Hypertriangle_boundary_sets_consistent(mesh):
 def test_P2_Hypertriangle_global_dofs_complete(mesh):
     fes = P2_Hypertriangle_Space(mesh)
 
-    # Anzahl DOFs muss stimmen = nv + ne
-    assert fes.ndof == fes.nv + fes.ne
+    assert fes.ndof == fes.nv + fes.nedges
 
-    # Alle DOFs liegen im Bereich
     assert set(range(fes.ndof)) == \
-           set(range(fes.nv)) | set(range(fes.nv, fes.nv + fes.ne))
+           set(range(fes.nv)) | set(range(fes.nv, fes.nv + fes.nedges))
 
 
 def test_P2_setP2_on_nodes(mesh):

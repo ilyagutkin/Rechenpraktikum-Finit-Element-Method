@@ -42,15 +42,13 @@ class IntRule4D(IntRuleTesserakt):
     @staticmethod
     def get_4d_integration_rule(order):
         """
-        Liefert die Knoten und Gewichte einer Tensorprodukt-Integrationsregel in 4D auf [0,1]^4
+        Gives the weights and nodes for the integration rule in 4D on [0,1]^4
 
         Returns:
             nodes_4d: ndarray shape (n^4, 4)
             weights_4d: ndarray shape (n^4,)
         """
         nodes_1d, weights_1d = IntRule4D.get_1d_rule_unit_interval(order)
-
-        # alle Kombinationen von 4D-Punkten
         nodes_4d = []
         weights_4d = []
 
@@ -74,7 +72,7 @@ class IntRule4D(IntRuleTesserakt):
         
 def _simplex_unit_volume(m: int) -> float:
     """
-    Volumen des m-dimensionalen Unit-Simplex
+    Volume of m-dimensional Unit-Simplex
     { x_i >= 0, sum x_i <= 1 } = 1 / m!
     """
     v = 1.0
@@ -85,8 +83,8 @@ def _simplex_unit_volume(m: int) -> float:
 
 def _compositions(n: int, k: int):
     """
-    Generator für Kompositionen von n in k nichtnegative Teile.
-    Entspricht comp_next aus Burkardt.
+    Generator for compositions of n into k nonnegative parts.
+    Corresponds to comp_next from Burkardt.
     """
     if k == 1:
         yield (n,)
@@ -98,7 +96,7 @@ def _compositions(n: int, k: int):
 
 def _gm_rule_size(rule: int, m: int) -> int:
     """
-    Anzahl der Stützstellen N für GM-Rule 'rule' im m-Simplex:
+    Number of nodes N for GM-Rule 'rule' in the m-simplex:
     N = C(m + rule + 1, rule)
     """
     from math import comb
@@ -107,22 +105,22 @@ def _gm_rule_size(rule: int, m: int) -> int:
 
 def _gm_unit_rule_set(rule: int, m: int):
     """
-    Python-Port von gm_unit_rule_set (Burkardt) für den
-    m-dimensionalen Unit-Simplex.
+    Python port of gm_unit_rule_set (Burkardt) for the
+    m-dimensional unit simplex.
 
     Parameters
     ----------
     rule : int
-        GM-Index s >= 0 (Exaktheit = 2*s + 1)
+        GM index s >= 0 (exactness = 2*s + 1)
     m : int
         Dimension
 
     Returns
     -------
     w : (N,) array
-        Gewichte
+        Weights
     x : (m, N) array
-        Knoten im Unit-Simplex
+        Nodes in the unit simplex
     """
     s = rule
     d = 2 * s + 1
@@ -153,11 +151,9 @@ def _gm_unit_rule_set(rule: int, m: int):
         one_pm = -one_pm
         beta_sum = s - i
 
-        # Komposition von beta_sum in (m+1) Teile
         for beta in _compositions(beta_sum, m + 1):
             if k >= n:
                 raise RuntimeError("Too many GM points generated")
-            # beta[1:] entspricht beta(2:m+1)
             x[:, k] = (2 * np.array(beta[1:], dtype=float) + 1.0) / float(d + m - 2 * i)
             w[k] = weight
             k += 1
@@ -202,7 +198,7 @@ class IntRulePentatope(IntRuleSimplex4D):
     def _init_from_gm(self, s: int):
         m = 4
         w, x = _gm_unit_rule_set(s, m)
-        # Tests erwarten nodes als (N,4)
+        
         self.nodes = x.T.copy()
         self.weights = w.copy()
         self.exactness_degree = 2 * s + 1

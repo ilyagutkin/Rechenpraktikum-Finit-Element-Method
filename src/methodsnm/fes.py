@@ -532,43 +532,12 @@ class P2_Hypertriangle_Space(FESpace):
 
     def __init__(self, mesh):
         self.mesh = mesh
-        self._build_edges_from_hypercells()
         self.nv = len(mesh.points)
-        self.ne = len(self.mesh.edges)
-        self.ndof = self.nv + self.ne
+        self.nedges = len(self.mesh.edges)
+        self.ndof = self.nv + self.nedges 
         self.fe = P2_Hypertriangle_FE()
 
-    def _build_edges_from_hypercells(self):
-        """
-        Build global edge list and hypercells->edges connectivity
-        from hypercells (each with 5 vertices).
-        """
-        # if edges already exist, reuse them
-        if getattr(self.mesh, "edges", None) is not None and \
-           getattr(self.mesh, "hypercells2edges", None) is not None:
-            return
-
-        cells = self.mesh.elements()   # hypercells, shape (ncells, 5)
-        edge_dict = {}                 # (v1,v2) -> edge index
-        cells2edges = []
-
-        for el in cells:
-            verts = list(el)
-            local_edges = []
-            # all pairs of 5 vertices -> 10 edges
-            for a in range(5):
-                for b in range(a+1, 5):
-                    v1, v2 = verts[a], verts[b]
-                    key = (v1, v2) if v1 < v2 else (v2, v1)
-                    if key not in edge_dict:
-                        edge_dict[key] = len(edge_dict)
-                    local_edges.append(edge_dict[key])
-            cells2edges.append(local_edges)
-
-        # store on mesh for reuse
-        self.mesh.edges = np.array(list(edge_dict.keys()), dtype=int)
-        self.mesh.hypercells2edges = np.array(cells2edges, dtype=int)
-
+    
     def _finite_element(self, elnr):
         """Return the P2 hypertriangle finite element template."""
         return self.fe
@@ -580,8 +549,10 @@ class P2_Hypertriangle_Space(FESpace):
         - last 10: edge dofs (global index shifted by nv)
         """
         verts = self.mesh.elements()[elnr]
-        edge_ids = self.mesh.hypercells2edges[elnr]
-        return np.concatenate([verts, self.nv + edge_ids])
+        edge = self.mesh.hypercell2edge[elnr]
+        edge_ids = self.mesh.index_of_edge(edge)
+        edge_ids = [self.nv + i for i in edge_ids]
+        return np.concatenate([verts, edge_ids])
     
     def boundary_dofs(self):
         """Return all boundary DOF indices for the P2 hypertriangle space.

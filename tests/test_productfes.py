@@ -10,11 +10,6 @@ from methodsnm.mesh_4d import *
 from netgen.csg import unit_cube
 from ngsolve import Mesh,VOL,specialcf
 
-
-# ----------------------------------------------------------
-#  FIXTURE: nur homogener Raum erlaubt (z. B. nur 4D)
-# ----------------------------------------------------------
-
 @pytest.fixture
 def mesh1d():
     return Mesh1D((0, 1), 4)
@@ -32,7 +27,7 @@ def mesh4d():
 
 
 # ----------------------------------------------------------
-#  1. Offsets korrekt
+#  1. Offsets correct
 # ----------------------------------------------------------
 
 @pytest.mark.parametrize("nblocks", [1, 2, 3])
@@ -40,15 +35,13 @@ def test_offsets_hypertriangle(mesh4d, nblocks):
     spaces = [P1_Hypertriangle_Space(mesh4d) for _ in range(nblocks)]
     W = Productspace(spaces)
 
-    # Offsets müssen streng wachsen
     assert all(W.offsets[i] <= W.offsets[i+1] for i in range(len(W.offsets)-1))
 
-    # letzter Offset = Gesamt-DOF-Anzahl
     assert W.offsets[-1] == sum(V.ndof for V in spaces)
 
 
 # ----------------------------------------------------------
-#  2. DOFs pro Element korrekt zu globalen DOFs gemappt
+#  2. Local Element DOFs mapping to global DOFs 
 # ----------------------------------------------------------
 
 def test_element_dofs_hypertriangle(mesh4d):
@@ -69,7 +62,7 @@ def test_element_dofs_hypertriangle(mesh4d):
 
 
 # ----------------------------------------------------------
-#  3. get_freedofs — sehr wichtiger Test
+#  3. get_freedofs 
 # ----------------------------------------------------------
 
 def test_get_freedofs(mesh4d):
@@ -77,10 +70,6 @@ def test_get_freedofs(mesh4d):
     V2 = P1_Hypertriangle_Space(mesh4d)
 
     W = Productspace([V1, V2])
-
-    # blockiere DOFs:
-    # Block 0: DOF 0,1
-    # Block 1: DOF 3
     blocked = {0: [0, 1], 1: [3]}
 
     freedofs = W.get_freedofs(blocked)
@@ -98,7 +87,7 @@ def test_get_freedofs(mesh4d):
 
 
 # ----------------------------------------------------------
-#  4. BlockFE korrekt zurückgegeben
+#  4. BlockFE 
 # ----------------------------------------------------------
 
 def test_blockfe(mesh4d):
@@ -117,7 +106,7 @@ def test_blockfe(mesh4d):
 
 
 # ----------------------------------------------------------
-#  5. Boundary-DOFs pro Block → korrekt gemerged
+#  5. Boundary-DOFs pro Block 
 # ----------------------------------------------------------
 
 def test_boundary_dofs_use_get_freedofs(mesh4d):
@@ -145,7 +134,7 @@ def test_boundary_dofs_use_get_freedofs(mesh4d):
 
 
 # ----------------------------------------------------------
-#  6. Vollständige DOF-Abdeckung
+#  6. Complete DOF coverage
 # ----------------------------------------------------------
 
 def test_dof_cover(mesh4d):
