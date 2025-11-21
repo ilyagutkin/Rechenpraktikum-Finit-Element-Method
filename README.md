@@ -65,6 +65,68 @@ The test suite can be executed from the terminal using:
 python3 -m pytest -vv
 ```
 
+## Author Contributions
+
+All components that extend the original 1D,2D framework to full four–dimensional space–time are entirely my own work.  
+This includes:
+
+- the complete **4D mesh infrastructure**, consisting of  
+  – structured tesseract meshes,  
+  – unstructured prism-based meshes,  
+  – the subdivision into pentatopes,
+- the corresponding **4D finite elements** (P1 and P2) and their reference transformations,
+- a dedicated **4D integration rule** based on the Grundmann–Möller formula,
+- the first prototype of a **4D visualization pipeline**  
+  (currently functional but not yet complete or polished),
+- the extension of the library to **product spaces**, enabling  
+  – vector‐valued finite element spaces,  
+  – mixed finite element formulations,  
+  – product FES constructions,
+- the expansion of the **MeshFunction** class to fully support vector-valued functions in 4D,
+- the development of multiple new **bilinear and linear form integrators**, including  
+  – a convection–diffusion integrator,  
+  – a Laplace‐operator without explicit time coupling,  
+  – a dedicated time‐integral operator,  
+  – and several operators required for building **SUPG-stabilized** formulations,
+- the design and implementation of a unified **Dirichlet boundary handling system**,  
+  implemented via an extended `set` method that works consistently in 1D, 2D and 4D.
+
+These contributions form the core of the space–time extension of the original FEM framework and constitute the main technical work of this project.
+
+
+## Acknowledgement
+
+This work is based on foundational material developed by **Christoph Lehrenfeld**.  
+The project originated from the method folder provided in his code base https://gitlab.gwdg.de/lehrenfeld/methodsnm, which served as the initial framework for the implementation.
+
+Large parts of the lecture notes included in this repository are adapted from his original material.  
+Only two lecture files were rewritten substantially:
+
+- the [**4D mesh construction lecture**](/lectures/4d_mesh_construction.ipynb), and  
+- the [**Introduction to FEM**](/lectures/intro_fem.ipynb/),
+
+both of which are based on my own (currently unpublished) Bachelor’s thesis.
+
+The stabilized SUPG term used in this project follows the formulations presented in:
+
+- *Numerical Methods in Fluids*, 2019 — **Danwitz**,  
+  *Simplex space-time meshes in compressible flow simulations*,  
+- *International Journal for Numerical Methods in Engineering*, 2023 — **Danwitz**,  
+  *Time-continuous and time-discontinuous space–time finite elements for pressure-robust SUPG-stabilized FEM for unsteady Navier–Stokes*,  
+- *On a Space-Time Extended Finite Element Method for the Solution of a Class of Two-Phase Mass Transport Problems*,  
+  by **Christoph Lehrenfeld**.
+
+The 4D integration routines in this project are based on the classical  
+**Grundmann–Möller integration rule**, introduced in:
+
+**A. Grundmann & H. Möller (1978)**,  
+*Invariant integration formulas for the n-simplex by combinatorial methods*,  
+SIAM Journal on Numerical Analysis.
+
+A further analytical discussion and extended derivations will be published in my Bachelor’s thesis.
+
+
+
 ## Documentation
 
 A complete API documentation has been generated using **pdoc** and is included in the `docs/` directory.  
