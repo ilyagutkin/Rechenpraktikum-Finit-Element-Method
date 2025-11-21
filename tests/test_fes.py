@@ -95,15 +95,13 @@ def test_P2_Hypertriangle_element_dofs_structure(mesh):
 
 def test_P2_Hypertriangle_edge_connectivity(mesh):
     fes = P2_Hypertriangle_Space(mesh)
-
     global_edges = set(tuple(sorted(e)) for e in mesh.edges)
 
     for elnr, verts in enumerate(mesh.elements()):
-        el_edges = mesh.hypercells2edges[elnr]
+        el_edges = mesh.hypercell2edge[elnr]
 
-        # Jede lokale Edge muss existieren
         for gid in el_edges:
-            v1, v2 = mesh.edges[gid]
+            v1, v2 = gid
             assert tuple(sorted((v1, v2))) in global_edges
 
 def test_P2_Hypertriangle_boundary_dofs(mesh):
