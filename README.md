@@ -12,7 +12,7 @@ The repository is organized into several main directories:
   In particular, the document [FEM Introduction](lectures/intro_fem.ipynb/) provides a concise summary of the finite element method and is highly recommended reading for anyone who wants to follow the implementation in detail.These lectures make no claim to completeness; they are intended only as a broad overview of the mathematical foundations relevant to the project.
 
 
-- [demos](demo/):  
+- [demos](/demos/):  
   This folder provides a collection of self-contained demonstration programs.  
   Each finite element space has its own dedicated demo, since the details of their implementation differ slightly.  
   The demos are designed to form the conceptual backbone for solving a wide range of PDEs:
@@ -113,6 +113,7 @@ The stabilized SUPG term used in this project follows the formulations presented
   *Simplex space-time meshes in compressible flow simulations*,  
 - *International Journal for Numerical Methods in Engineering*, 2023 — **Danwitz**,  
   *Time-continuous and time-discontinuous space–time finite elements for pressure-robust SUPG-stabilized FEM for unsteady Navier–Stokes*,  
+The construction of the 4D meshes and the specific decomposition into pentatopes is based on the work
 - *On a Space-Time Extended Finite Element Method for the Solution of a Class of Two-Phase Mass Transport Problems*,  
   by **Christoph Lehrenfeld**.
 
