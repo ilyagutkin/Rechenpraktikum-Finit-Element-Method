@@ -57,7 +57,7 @@ A further goal of the project is the development of a SUPG-like stabilization te
 The analytical derivation of this term has already been completed, and an implementation of the corresponding stabilized formulation will be added in the near future.  
 This extension aims to provide a robust and fully functional stabilized solver for space–time Navier–Stokes problems, complementing the existing framework for time-dependent convection–diffusion and other convection-dominated PDEs.
 
-- [Finally, the project includes an extensive collection of Pytests that verify the correctness of the individual components.  These tests are intended not only to ensure reliability but also to provide the reader with confidence that every implemented part of the framework behaves as expected. All implemented modules currently pass the full test suite. Additional tests have been prepared for future extensions of the solver.]
+- Finally, the project includes an extensive collection of Pytests that verify the correctness of the individual components.  These tests are intended not only to ensure reliability but also to provide the reader with confidence that every implemented part of the framework behaves as expected. All implemented modules currently pass the full test suite. Additional tests have been prepared for future extensions of the solver.
 
 The test suite can be executed from the terminal using:
 
