@@ -567,9 +567,13 @@ class P2_Hypertriangle_Space(FESpace):
             Sorted list of integer DOF indices on the boundary.
         """
         v = self.boundary_vertices()
-        return sorted(
-            list(v) + self._edge_boundary_dofs(v)
-        )
+        bndry_edge = self.mesh.boundary_edges.values()
+        bnd_edge = []
+        for i in list(bndry_edge):
+            i += self.nv
+            bnd_edge.append(i)
+
+        return sorted(list(v) + bnd_edge)
     
     def boundary_dofs_from_vertex_set(self, vset):
         """Return boundary DOFs (vertices + edges) restricted to vset.
@@ -589,16 +593,4 @@ class P2_Hypertriangle_Space(FESpace):
         e = self._edge_boundary_dofs(vset)
         return sorted(v + e)
 
-    def _edge_boundary_dofs(self, vertex_set):
-        """Helper: return edge DOFs for edges with both vertices in set.
-
-        Edge DOFs are stored after the vertex DOFs and thus are
-        returned as ``nv + edge_index``.
-        """
-        nv = self.nv
-        edge_dofs = []
-        for eid, (v1, v2) in enumerate(self.mesh.edges):
-            if v1 in vertex_set and v2 in vertex_set:
-                edge_dofs.append(nv + eid)
-        return edge_dofs
 

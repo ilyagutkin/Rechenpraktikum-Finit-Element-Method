@@ -216,6 +216,8 @@ class UnstructuredHypertriangleMesh(Mesh4D):
         self.initial_bndry_vertices = first
         self.top_bndry_vertices = last
         self._build_edges()
+        self._build_volumes()
+        self._build_faces()
         self._build_p2_dofs()
         self.ne = len(self.hypercells)
 
@@ -231,26 +233,119 @@ class UnstructuredHypertriangleMesh(Mesh4D):
     def _build_edges(self):
         """
         Build all unique edges across all 4D simplices.
-        Each simplex has 5 vertices → 10 edges.
+        Also determine boundary edges via edge-counting:
+            count == 1 → boundary edge
+            count >= 2 → interior edge
         """
-        # concise docstring above; implementation unchanged
+
+        edge_count = {}         # count occurrences of each edge
         edge_set = set()
-        self.hypercell2edge =[]
+        self.hypercell2edge = []
 
         for cell in self.hypercells:
             v0, v1, v2, v3, v4 = cell
+
+            # All 10 edges of a 4-simplex EXPLICIT
             edges_local = [
                 (v0, v1), (v0, v2), (v0, v3), (v0, v4),
                 (v1, v2), (v1, v3), (v1, v4),
                 (v2, v3), (v2, v4),
                 (v3, v4),
             ]
-            self.hypercell2edge.append(edges_local)
-            for e in edges_local:
-                edge_set.add(tuple(sorted(e)))
 
-        self.edges = np.array(sorted(edge_set), dtype=int)   
+            self.hypercell2edge.append(edges_local)
+
+            for e in edges_local:
+                key = tuple(sorted(e))
+                edge_set.add(key)
+                edge_count[key] = edge_count.get(key, 0) + 1
+
+        # Global list of unique edges
+        self.edges = np.array(sorted(edge_set), dtype=int)
+
+        # Map edge -> index
         self.edge_to_index = {tuple(edge): i for i, edge in enumerate(self.edges)}
+
+        # Boundary edges: appear only once
+        self.boundary_edges = {
+            edge: eid
+            for edge, eid in self.edge_to_index.items()
+            if edge_count[edge] == 1
+        }
+
+        return self.edges
+
+
+    def _build_volumes(self):
+        """
+        Compute all 3D volume facets (4 vertices) of each hypercell.
+        For a 4-simplex with vertices (v0..v4), the 5 volumes are:
+        [v1,v2,v3,v4], [v0,v2,v3,v4], [v0,v1,v3,v4],
+        [v0,v1,v2,v4], [v0,v1,v2,v3].
+
+        Additionally determines which volumes lie on the boundary.
+        """
+        volume_count = {}        # counts occurrences of each volume
+        volume_set = set()       # unique volumes
+        self.hypercell2volume = []  # local volumes per hypercell
+
+        for cell in self.hypercells:
+            v0, v1, v2, v3, v4 = cell
+
+            volumes_local = [
+                (v1, v2, v3, v4),
+                (v0, v2, v3, v4),
+                (v0, v1, v3, v4),
+                (v0, v1, v2, v4),
+                (v0, v1, v2, v3),
+            ]
+
+            self.hypercell2volume.append(volumes_local)
+
+            for vol in volumes_local:
+                key = tuple(sorted(vol))
+                volume_set.add(key)
+                volume_count[key] = volume_count.get(key, 0) + 1
+
+        # global list of unique volumes
+        self.volumes = np.array(sorted(volume_set), dtype=int)
+        self.volume_to_index = {tuple(vol): i for i, vol in enumerate(self.volumes)}
+
+        # boundary volumes = those that appear only once
+        self.boundary_volumes = [vol for vol, cnt in volume_count.items() if cnt == 1]
+
+        return self.volumes
+
+    def _build_faces(self):
+        """
+        Build all triangular faces (3 vertices) of the 4D simplex mesh.
+        Each 3D tetra volume has 4 faces.
+        """
+        face_set = set()
+        self.volume2face = []
+
+        # first make sure volumes exist
+        if not hasattr(self, "volumes"):
+            self._build_volumes()
+
+        for vol in self.volumes:
+            a, b, c, d = vol
+
+            faces_local = [
+                (b, c, d),
+                (a, c, d),
+                (a, b, d),
+                (a, b, c),
+            ]
+
+            self.volume2face.append(faces_local)
+
+            for f in faces_local:
+                face_set.add(tuple(sorted(f)))
+
+        self.faces = np.array(sorted(face_set), dtype=int)
+        self.face_to_index = {tuple(face): i for i, face in enumerate(self.faces)}
+
     
     def index_of_edge(self, a):
         """
@@ -265,9 +360,7 @@ class UnstructuredHypertriangleMesh(Mesh4D):
 
         key = tuple(sorted(a))
         return self.edge_to_index[key]
-
-
-
+    
     def _build_p2_dofs(self):
         """
         For each hypercell, create the list of local DOFs:
