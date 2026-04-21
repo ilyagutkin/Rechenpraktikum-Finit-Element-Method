@@ -89,9 +89,10 @@ class SourceIntegral(LinearFormIntegral):
         return np.dot(shapes.T, weights)
     
 class SUPGSourceIntegral(LinearFormIntegral):
-    def __init__(self, f=ConstantFunction(np.ones(1)),wind=None):
+    def __init__(self, f=ConstantFunction(np.ones(1)),wind=None, eps=1):
         self.coeff = f
         self.wind = wind
+        self.eps = eps
 
     def compute_element_vector(self, fe, trafo, intrule=None):
         """Compute the SUPG-stabilized element load vector.
@@ -145,17 +146,118 @@ class SUPGSourceIntegral(LinearFormIntegral):
         adetF = array([abs(det(F[i,:,:])) for i in range(F.shape[0])])
         wind = self.wind.evaluate(intrule.nodes, trafo)
         f = self.coeff.evaluate(intrule.nodes, trafo)
-        cinv = 1
+        cinv = fe.order **2
         tmp = np.einsum("nij,jk->nik", invF, M)
         expr = np.einsum("nij,nkj->nik", tmp, invF)
         tau = np.einsum("ni,nij,nj->n", wind, expr, wind)
-        gamma_T = 1 / np.sqrt(tau + (cinv / h)**2)
+        gamma_T = 1 / np.sqrt(tau + (cinv * self.eps / h**2)**2)
 
         w = einsum("nij,njb->nib", invF, shapes) 
         conv = np.einsum("nd,ndi->ni", wind, w)
 
         scale = gamma_T * adetF * intrule.weights
         return np.einsum("n,n,nj->j", scale , f , conv )
+    
+class SUPGSourceIntegralProjected(LinearFormIntegral):
+    def __init__(self, f, wind, eps=1.0):
+        self.coeff = f       # source f
+        self.wind = wind     # wind = (w,1)
+        self.eps = eps
+
+    def compute_element_vector(self, fe, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(2*fe.order, fe.eltype)
+
+        # metric matrix M (same as before)
+        if trafo.mesh.dimension == 2:
+            M = np.array([[2/np.sqrt(3), 1/np.sqrt(3)],
+                          [1/np.sqrt(3), 2/np.sqrt(3)]])
+        elif trafo.mesh.dimension == 4:
+            M = 5**(-1/4) * np.array([[2,1,1,1],
+                                      [1,2,1,1],
+                                      [1,1,2,1],
+                                      [1,1,1,2]])
+        else:
+            raise ValueError("Unsupported dimension")
+
+        h = trafo.mesh.special_meshsize
+
+        # shapes: reference gradients
+        dsh = fe.evaluate(intrule.nodes, deriv=True)  # (nq, dim_ref, ndof)
+
+        # geometry
+        F    = trafo.jacobian(intrule.nodes)
+        invF = np.array([np.linalg.inv(F[i,:,:].T) for i in range(F.shape[0])])  # J^{-T}
+        detF = np.array([abs(np.linalg.det(F[i,:,:])) for i in range(F.shape[0])])
+
+        # wind + source
+        wind = self.wind.evaluate(intrule.nodes, trafo)     # (nq, dim)
+        f    = self.coeff.evaluate(intrule.nodes, trafo)    # (nq,) or (nq,1)
+        f    = f.reshape(-1)                                # ensure (nq,)
+
+        # gamma_T (pointwise but constant per element in your setting)
+        cinv = fe.order**2
+        tmp  = np.einsum("nij,jk->nik", invF, M)
+        expr = np.einsum("nij,nkj->nik", tmp, invF)
+        tau  = np.einsum("ni,nij,nj->n", wind, expr, wind)
+        gamma = 1.0 / np.sqrt(tau + (cinv * self.eps / (h**2))**2)
+        gamma_T = float(gamma[0])
+
+        # psi_i = (w,1)·∇phi_i in world coords
+        grad_phys = np.einsum("nij,njk->nik", invF, dsh)          # (nq, dim, ndof)
+        psi = np.einsum("nd,ndi->ni", wind, grad_phys)            # (nq, ndof)
+
+        # unweighted L2 projection Pi: subtract element mean of psi_i
+        wq = detF * intrule.weights                               # (nq,)
+        vol = np.sum(wq)
+
+        mean_psi = (1.0/vol) * np.einsum("n,ni->i", wq, psi)      # (ndof,)
+        psi_pi = psi - mean_psi[None, :]                          # (nq, ndof)
+
+        # integrate: b_i = ∫ gamma_T * f * Pi(psi_i)
+        b = gamma_T * np.einsum("n,n,ni->i", wq, f, psi_pi)
+        return b
+
+    
+class IIntegralSUPGSource(LinearFormIntegral):
+    def __init__(self, wind, f):
+        self.wind = wind      # GlobalFunction or ConstantVectorFunction
+        self.f = f            # source f(x)
+
+    def compute_element_vector(self, fe, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(2*fe.order, fe.eltype)
+        dsh = fe.evaluate(intrule.nodes, deriv=True)
+        F    = trafo.jacobian(intrule.nodes)
+        invF = np.array([np.linalg.inv(F[i,:,:].T) for i in range(F.shape[0])])
+        detF = np.array([abs(np.linalg.det(F[i,:,:])) for i in range(F.shape[0])])
+        scale = detF * intrule.weights                # (nq,)
+
+        # world gradients
+        grad_phys = np.einsum("nij,njk->nik", invF, dsh)   # (nq, dim, ndof)
+
+        # wind + source
+        wind = self.wind.evaluate(intrule.nodes, trafo)    # (nq, dim)
+        fval = self.f.evaluate(intrule.nodes, trafo)        # (nq,)
+
+        # psi_i = (w,1)·grad φ_i
+        psi = np.einsum("nd,ndi->ni", wind, grad_phys)      # (nq, ndof)
+
+        # A_i = ∫ ψ_i dx
+        A = np.einsum("n,ni->i", scale, psi)
+
+        # B = ∫ f dx  (scalar)
+        B = np.einsum("n,n->", scale, fval)
+
+        # first term: ∫ ψ_i f dx
+        main = np.einsum("n,ni,n->i", scale, psi, fval)
+
+        # correction term: (1/|K|) A_i * B
+        vol = np.sum(scale)
+        correction = (A * B) / vol
+
+        return main - correction
+
 
 class BilinearFormIntegral(FormIntegral):
 
@@ -409,8 +511,9 @@ class ConvectionIntegral(BilinearFormIntegral):
         return ret
    
 class SUPGIntegral(BilinearFormIntegral):
-    def __init__(self, coeff=ConstantFunction(np.ones(1))):
+    def __init__(self, coeff=ConstantFunction(np.ones(1)), eps=1):
         self.coeff = coeff
+        self.eps = eps
 
     def compute_element_matrix(self, fe_test, fe_trial, trafo, intrule=None):
         """Compute the SUPG stabilization matrix.
@@ -458,11 +561,11 @@ class SUPGIntegral(BilinearFormIntegral):
         invF = array([inv(F[i,:,:].T) for i in range(F.shape[0])])
         adetF = array([abs(det(F[i,:,:])) for i in range(F.shape[0])])
         wind = self.coeff.evaluate(intrule.nodes, trafo)
-        cinv =1
+        cinv =fe_trial.order **2
         tmp = np.einsum("nij,jk->nik", invF, M)
         expr = np.einsum("nij,nkj->nik", tmp, invF)
         tau = np.einsum("ni,nij,nj->n", wind, expr, wind)
-        gamma_T = 1 / np.sqrt(tau + (cinv / h)**2)
+        gamma_T = 1 / np.sqrt(tau + (cinv**2 * self.eps / h**2)**2)
 
         grad_u_phys = np.einsum("nij,njb->nib", invF, shapes_trial)
         grad_v_phys = np.einsum("nij,njb->nib", invF, shapes_test)
@@ -472,7 +575,76 @@ class SUPGIntegral(BilinearFormIntegral):
 
         scale = gamma_T * adetF * intrule.weights  # (n,)
         ret = np.einsum("n,ni,nj->ij", scale, wind_grad_u, wind_grad_v)
+
+        if fe_trial.order == 3:
+            invF_x = invF[:, :, :3]  # shape (n, 3, 4) in 4D spacetime
+            Gx = np.einsum("nik,njk->nij", invF_x, invF_x)   # (n,4,4)
+            grad_lamb = np.array([
+                [-1.0, -1.0, -1.0, -1.0],
+                [ 1.0,  0.0,  0.0,  0.0],
+                [ 0.0,  1.0,  0.0,  0.0],
+                [ 0.0,  0.0,  1.0,  0.0],
+                [ 0.0,  0.0,  0.0,  1.0],
+            ])  # shape (5,4)
+            nq = len(intrule.weights)          # oder: intrule.nodes.shape[0]
+            lap_world = np.zeros((nq, fe_trial.ndof))
+
+            for i in range(5):
+                lap_world[:, i] = 4.0 * np.einsum("i,nij,j->n", grad_lamb[i], Gx, grad_lamb[i])
+            for k, (i, j) in enumerate(fe_trial.edge_pairs):
+                lap_world[:, 5 + k] = 8.0 * np.einsum("i,nij,j->n", grad_lamb[i], Gx, grad_lamb[j])
+
+            # consistency term:  -ε * ∫ γ ( (w,1)·∇v ) (Δ_x u ) dx
+            scale = gamma_T * adetF * intrule.weights
+            laplace_term = np.einsum("n,ni,nj->ij", -self.eps * scale, wind_grad_v, lap_world)
+            ret += laplace_term
+
         return ret
+
+class PressureStabilizationpq(BilinearFormIntegral):
+    def __init__(self, wind_coeff, eps, delta=1.0):
+        super().__init__()
+        self.wind_coeff = wind_coeff # Das w-Feld
+        self.eps = eps               # Diffusion
+        self.delta = delta           # Optionaler Skalar
+
+    def compute_element_matrix(self, fe_test, fe_trial, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(fe_test.order + fe_trial.order, fe_test.eltype)
+
+        dim_mesh = trafo.mesh.dimension
+        if dim_mesh == 2:
+            M = np.array([[2/sqrt(3), 1/sqrt(3)], [1/sqrt(3), 2/sqrt(3)]])
+        elif dim_mesh == 3:
+            M = np.array([[2, 1, 1], [1, 2, 1], [1, 1, 2]]) * (1/sqrt(2)) 
+        else:
+            M = np.eye(dim_mesh)
+
+        h = trafo.mesh.special_meshsize
+        cinv = fe_trial.order**2
+
+        shapes_test = fe_test.evaluate(intrule.nodes, deriv=True)
+        shapes_trial = fe_trial.evaluate(intrule.nodes, deriv=True)
+        
+        F = trafo.jacobian(intrule.nodes)
+        invF = array([inv(F[i,:,:].T) for i in range(F.shape[0])])
+        adetF = array([abs(det(F[i,:,:])) for i in range(F.shape[0])])
+        weights = intrule.weights
+ 
+        wind = self.wind_coeff.evaluate(intrule.nodes, trafo) # Erwartet (n_qp, dim)
+        tmp = np.einsum("nij,jk->nik", invF, M)
+        expr = np.einsum("nij,nkj->nik", tmp, invF)
+
+        tau_val = np.einsum("ni,nij,nj->n", wind, expr, wind)
+        gamma_T = 1.0 / np.sqrt(tau_val**2 + (cinv**2 * self.eps / h**2)**2)
+
+        grad_test  = np.einsum("nij,njb->nib", invF, shapes_test)
+        grad_trial = np.einsum("nij,njb->nib", invF, shapes_trial)
+
+        res = np.einsum("n,ndk,ndl,n,n->kl", 
+                        gamma_T, grad_test, grad_trial, adetF, weights)
+
+        return self.delta * res
 
 class DivUQIntegrator(BilinearFormIntegral):
     def __init__(self, coeff=ConstantFunction(1)):
@@ -571,6 +743,81 @@ class DivVPIntegrator(BilinearFormIntegral):
 
         return ret
 
+class PressureStabilizationSUPGIntegral(BilinearFormIntegral):
+    """
+    Simple pressure-gradient stabilization:
+        s(p, q) = delta * gamma *(∇p, ∇q)
+    """
+
+    def __init__(self, coeff=ConstantFunction(np.ones(1)), eps=1,delta=1.0):
+        self.coeff = coeff
+        self.eps = eps
+        self.delta = delta
+
+    def compute_element_matrix(self, fe_test, fe_trial, trafo, intrule=None):
+        # EXACT same structure as LaplaceIntegral_without_time, but with coeff = delta
+        if intrule is None:
+            if fe_test.eltype != fe_trial.eltype:
+                raise Exception("Finite elements must have the same el. type")
+            intrule = select_integration_rule(
+                fe_test.order + fe_trial.order,
+                fe_test.eltype
+            )
+
+        """Compute pressure stabilization matrix.
+
+        Implements s(p,q) = delta * \int_K \nabla p \cdot \nabla q \; dx
+        but returns the scaled and (negatively) stabilized version used
+        in the code (-h^2 * s(p,q)) where h is the local mesh size.
+
+        Parameters
+        ----------
+        fe_test, fe_trial : FiniteElement
+            Scalar finite element descriptors for pressure test and trial.
+        trafo : object
+            Transformation providing Jacobian and mesh metadata.
+        intrule : IntegrationRule, optional
+            Quadrature rule to use.
+
+        Returns
+        -------
+        ndarray
+            Local stabilization matrix for the pressure space.
+        """
+        if trafo.mesh.dimension == 2:
+            M = np.array([[2/sqrt(3), 1/sqrt(3)], [1/sqrt(3), 2/sqrt(3)]])
+        elif trafo.mesh.dimension == 4:
+            M = 5 **-1/4*np.array([
+    [2, 1, 1, 1],
+    [1, 2, 1, 1],
+    [1, 1, 2, 1],
+    [1, 1, 1, 2]])
+        h = trafo.mesh.special_meshsize
+        shapes_test = fe_test.evaluate(intrule.nodes, deriv=True)
+        shapes_trial = fe_trial.evaluate(intrule.nodes, deriv=True)
+        F = trafo.jacobian(intrule.nodes)
+        invF = array([inv(F[i,:,:].T) for i in range(F.shape[0])])
+        adetF = array([abs(det(F[i,:,:])) for i in range(F.shape[0])])
+        wind = self.coeff.evaluate(intrule.nodes, trafo)
+        cinv =fe_trial.order **2
+        tmp = np.einsum("nij,jk->nik", invF, M)
+        expr = np.einsum("nij,nkj->nik", tmp, invF)
+        tau = np.einsum("ni,nij,nj->n", wind, expr, wind)
+        gamma_T = 1 / np.sqrt(tau + (cinv**2 * self.eps / h**2)**2)
+
+        weights =  gamma_T *intrule.weights
+
+        # map reference gradients to physical gradients
+        grad_test  = einsum("nij,njb->nib", invF, shapes_test)       # (n_qp, dim, ndof_test)
+        grad_trial = einsum("nij,njb->nib", invF, shapes_trial)  
+
+        # contraction: ∫ grad_test · grad_trial * |detJ| * w
+        ret = self.delta * einsum("ndk,ndl,n,n->kl",
+                                   grad_test, grad_trial, adetF, weights)
+        h = trafo.mesh.special_meshsize
+
+        return -ret
+
 class PressureStabilizationIntegral(BilinearFormIntegral):
     """
     Simple pressure-gradient stabilization:
@@ -632,3 +879,204 @@ class PressureStabilizationIntegral(BilinearFormIntegral):
 
         return -h**2*ret
 
+class SUPGProjIntegral(BilinearFormIntegral):
+    def __init__(self, wind_coeff, eps=1.0):
+        self.coeff = wind_coeff   # wind = (w,1) in spacetime
+        self.eps = eps
+
+    def compute_element_matrix(self, fe_test, fe_trial, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(fe_test.order + fe_trial.order, fe_test.eltype)
+
+        # metric matrix M (same as you use)
+        if trafo.mesh.dimension == 2:
+            M = np.array([[2/np.sqrt(3), 1/np.sqrt(3)],
+                          [1/np.sqrt(3), 2/np.sqrt(3)]])
+        elif trafo.mesh.dimension == 4:
+            M = 5**(-1/4) * np.array([[2,1,1,1],
+                                      [1,2,1,1],
+                                      [1,1,2,1],
+                                      [1,1,1,2]])
+        else:
+            raise ValueError("Unsupported dimension")
+
+        # geometry
+        F = trafo.jacobian(intrule.nodes)                              # (nq,dim,dim)
+        invF = np.array([np.linalg.inv(F[i,:,:].T) for i in range(F.shape[0])])  # J^{-T}
+        detF = np.array([abs(np.linalg.det(F[i,:,:])) for i in range(F.shape[0])])
+
+        # wind and h
+        wind = self.coeff.evaluate(intrule.nodes, trafo)               # (nq,dim)
+        h = trafo.mesh.special_meshsize
+        cinv = fe_trial.order**2
+
+        # build gamma_T (pointwise, but constant per element in your setting)
+        tmp  = np.einsum("nij,jk->nik", invF, M)
+        expr = np.einsum("nij,nkj->nik", tmp, invF)
+        tau  = np.einsum("ni,nij,nj->n", wind, expr, wind)
+        gamma = 1.0 / np.sqrt(tau + ((cinv**2) * self.eps / (h**2))**2)
+
+        # treat gamma_T as element-constant scalar:
+        gamma_T = float(gamma[0])
+
+        # basis gradients (reference -> world)
+        dsh_test  = fe_test.evaluate(intrule.nodes, deriv=True)         # (nq,dim_ref,ntest)
+        dsh_trial = fe_trial.evaluate(intrule.nodes, deriv=True)        # (nq,dim_ref,ntrial)
+
+        grad_test  = np.einsum("nij,njk->nik", invF, dsh_test)          # (nq,dim,ntest)
+        grad_trial = np.einsum("nij,njk->nik", invF, dsh_trial)         # (nq,dim,ntrial)
+
+        psi_test  = np.einsum("nd,ndi->ni", wind, grad_test)            # (nq,ntest)
+        psi_trial = np.einsum("nd,ndi->ni", wind, grad_trial)           # (nq,ntrial)
+
+        # L2 scale on element
+        wq = detF * intrule.weights
+        vol = np.sum(wq)
+
+        # (psi_trial, Pi psi_test)  -> we project the test-side
+        M0 = np.einsum("n,ni,nj->ij", wq, psi_trial, psi_test)          # (ntrial,ntest)
+        b_trial = np.einsum("n,ni->i", wq, psi_trial)                   # (ntrial,)
+        b_test  = np.einsum("n,nj->j", wq, psi_test)                    # (ntest,)
+
+        Kproj = M0 - (1.0/vol) * np.outer(b_trial, b_test)              # (ntrial,ntest)
+
+        return gamma_T * Kproj
+
+
+
+class GradPWindGradVIntegrator(BilinearFormIntegral):
+    """
+    Assembles the stabilization term for the B(v,p) block (b, 3):
+    sum_K ∫_K γ_K * ( (w,1)·∇ v_b ) * (grad_x p) dx
+    """
+    def __init__(self, coeff=ConstantFunction(np.ones(1)), eps=1.0):
+        self.coeff = coeff
+        self.eps = eps
+
+    def compute_element_matrix(self, fe_test, fe_trial, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(fe_test.order + fe_trial.order, fe_test.eltype)
+
+        if trafo.mesh.dimension == 4:
+            M = 5 ** (-1/4) * np.array([
+                [2, 1, 1, 1], [1, 2, 1, 1], [1, 1, 2, 1], [1, 1, 1, 2]
+            ])
+        else:
+            M = np.array([[2/np.sqrt(3), 1/np.sqrt(3)], [1/np.sqrt(3), 2/np.sqrt(3)]])
+
+        h = trafo.mesh.special_meshsize
+        F = trafo.jacobian(intrule.nodes)
+        invF = array([inv(Fi.T) for Fi in F])
+        adetF = array([abs(det(Fi)) for Fi in F])
+        wind = self.coeff.evaluate(intrule.nodes, trafo)
+
+        # Gamma (basierend auf Ordnung der Geschwindigkeit)
+        cinv = fe_test.order ** 2
+        tmp  = np.einsum("nij,jk->nik", invF, M)
+        expr = np.einsum("nij,nkj->nik", tmp, invF)
+        tau  = np.einsum("ni,nij,nj->n", wind, expr, wind)
+        gamma_T = 1.0 / np.sqrt(tau + (cinv**2 * self.eps / h**2)**2)
+
+        # Physikalische Gradienten
+        grad_v_full = np.einsum("nij,njb->nib", invF, fe_test.evaluate(intrule.nodes, deriv=True))
+        grad_p_full = np.einsum("nij,njb->nib", invF, fe_trial.evaluate(intrule.nodes, deriv=True))
+
+        # --- KORREKTUR ---
+        # 1. Richtungsableitung der Testfunktion v (4D)
+        wind_grad_v = np.einsum("nd,ndi->ni", wind, grad_v_full)
+        
+        # 2. Slicing: Nur räumlicher Gradient der Trialfunktion p (x,y,z)
+        grad_p_spatial = grad_p_full[:, :3, :]
+
+        # 3. Integration
+        scale = gamma_T * adetF * intrule.weights
+        
+        # i = Test (v), j = Trial (p)
+        # d summiert über räumliche Dimensionen 0,1,2
+        return np.einsum("n,ni,ndj->ij", scale, wind_grad_v, grad_p_spatial)
+
+
+class WindResWindGradQIntegrator(BilinearFormIntegral):
+    """
+    Assembles the stabilization term for the B(u,q) block (3, b):
+    sum_K ∫_K γ_K * ( (w,1)·∇ u_b ) * (grad_x q) dx
+    """
+    def __init__(self, coeff=ConstantFunction(np.ones(1)), eps=1.0):
+        self.coeff = coeff  # wind field (w,1)
+        self.eps = eps
+
+    def compute_element_matrix(self, fe_test, fe_trial, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(fe_test.order + fe_trial.order, fe_test.eltype)
+        
+        # Metrik-Matrix M für 4D oder 2D
+        if trafo.mesh.dimension == 4:
+            M = 5**(-1/4) * np.array([[2,1,1,1],[1,2,1,1],[1,1,2,1],[1,1,1,2]])
+        else:
+            M = np.array([[2/np.sqrt(3), 1/np.sqrt(3)], [1/np.sqrt(3), 2/np.sqrt(3)]])
+
+        h = trafo.mesh.special_meshsize
+        F = trafo.jacobian(intrule.nodes)
+        invF = array([inv(Fi.T) for Fi in F])
+        adetF = array([abs(det(Fi)) for Fi in F])
+        wind = self.coeff.evaluate(intrule.nodes, trafo)
+
+        # Gamma-Parameter (Stabilisierung)
+        cinv = fe_trial.order**2
+        tmp = np.einsum("nij,jk->nik", invF, M)
+        expr = np.einsum("nij,nkj->nik", tmp, invF)
+        tau = np.einsum("ni,nij,nj->n", wind, expr, wind)
+        gamma_T = 1.0 / np.sqrt(tau + (cinv**2 * self.eps / h**2)**2)
+
+        # Physikalische Gradienten (4D)
+        grad_q_full = np.einsum("nij,njb->nib", invF, fe_test.evaluate(intrule.nodes, deriv=True))
+        grad_u_full = np.einsum("nij,njb->nib", invF, fe_trial.evaluate(intrule.nodes, deriv=True))
+
+        # --- KERNSTÜCK DER KORREKTUR ---
+        # 1. Richtungsableitung für u bleibt 4D (w_x, w_y, w_z, 1)
+        wind_grad_u = np.einsum("nd,ndi->ni", wind, grad_u_full)
+        
+        # 2. Slicing: Nur der räumliche Gradient für q (x, y, z)
+        grad_q_spatial = grad_q_full[:, :3, :] 
+
+        # 3. Integration: gamma * (wind_grad_u) * (summe über räumliche grad_q)
+        scale = gamma_T * adetF * intrule.weights
+        
+        # nd summiert hier über d=0,1,2 (die 3 Raumdimensionen)
+        return np.einsum("n,ni,ndj->ji", scale, wind_grad_u, grad_q_spatial)
+    
+class PressureSUPGSourceIntegral(LinearFormIntegral):
+    def __init__(self, fx, fy, fz, w_coeff, eps=1.0):
+        self.fx, self.fy, self.fz = fx, fy, fz
+        self.w_coeff = w_coeff
+        self.eps = eps
+
+    def compute_element_vector(self, fe, trafo, intrule=None):
+        if intrule is None:
+            intrule = select_integration_rule(fe.order + 1, fe.eltype)
+
+        h = trafo.mesh.special_meshsize
+        F = trafo.jacobian(intrule.nodes)
+        invF = array([inv(Fi.T) for Fi in F])
+        adetF = array([abs(det(Fi)) for Fi in F])
+
+        # 1. Gradient von q (4D: x,y,z,t)
+        shapes_q = fe.evaluate(intrule.nodes, deriv=True)
+        grad_q_full = np.einsum("nij,njb->nib", invF, shapes_q) 
+        
+        # 2. Kraftkomponenten einzeln auswerten und zu (nq, 3) stacken
+        fx_v = self.fx.evaluate(intrule.nodes, trafo)
+        fy_v = self.fy.evaluate(intrule.nodes, trafo)
+        fz_v = self.fz.evaluate(intrule.nodes, trafo)
+        f_val = np.stack([fx_v, fy_v, fz_v], axis=1)
+
+        # 3. gamma_K (4D Metrik für Space-Time Wind)
+        M = 5**(-1/4) * np.array([[2,1,1,1],[1,2,1,1],[1,1,2,1],[1,1,1,2]])
+        wind = self.w_coeff.evaluate(intrule.nodes, trafo)
+        tau = np.einsum("ni,nij,nj->n", wind, np.einsum("nij,nkj->nik", np.einsum("nij,jk->nik", invF, M), invF), wind)
+        gamma_T = 1.0 / np.sqrt(tau + (1.0**2 * self.eps / h**2)**2)
+
+        # 4. Skalarprodukt: gamma_K * sum_{d=0}^2 (f_d * dq/dx_d)
+        # d geht über 0,1,2 (Raum). grad_q_full[:, :3, :] extrahiert diese.
+        scale = gamma_T * adetF * intrule.weights
+        return np.einsum("n,nd,ndj->j", scale, f_val, grad_q_full[:, :3, :])

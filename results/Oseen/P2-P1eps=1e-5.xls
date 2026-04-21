@@ -1,0 +1,23 @@
+
+without SUPG
+Results for nu = 1e-05:
+L2 difference u1: 19.16900622840161
+L2 difference u2: 19.312471975313702
+L2 difference u3: 19.26631137124216
+L2 difference p: 3.424946314371375
+matilda@matilda-Lenovo-V155-15API:~/Bachelorarbeit/methodsnmbetter$ /bin/python3 /home/matilda/Bachelorarbeit/methodsnmbetter/demos/linearised_Navier_Stokes/SUPG_P2-P1.py
+source module for methodsNM imported.
+4256  free dofs,  295  boundary dofs (not free) 14076  total dofs
+
+Results for nu = 1e-05:
+L2 difference u1: 0.12275225782301635
+L2 difference u2: 0.10926576751400426
+L2 difference u3: 0.10865411895971967
+L2 difference p: 0.28416969747749665
+
+with projected supg
+Results for nu = 1e-05:
+L2 difference u1: 13.030456205006034
+L2 difference u2: 12.922884188545753
+L2 difference u3: 13.532033023145049
+L2 difference p: 3.9244740633639967

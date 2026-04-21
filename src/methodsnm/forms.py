@@ -211,3 +211,114 @@ def compute_difference_L2(uh, uex, mesh, intorder=5):
         w = array([abs(det(F[i,:,:])) * intrule.weights[i] for i in range(F.shape[0])])
         sumint += np.dot(w, diff)
     return np.sqrt(sumint)
+
+def analyze_stability(uh, uex, wind_coeff, mesh, intorder=5):
+    """
+    Berechnet L2-Fehler UND den Fehler im Streamline-Gradienten.
+    Letzterer zeigt uns, ob die Methode Oszillationen (Wiggles) hat.
+    """
+    sum_l2 = 0
+    sum_streamline = 0
+    
+    for elnr in range(len(mesh.elements())):
+        trafo = mesh.trafo(elnr)
+        intrule = select_integration_rule(intorder, trafo.eltype)
+        
+        # 1. Werte evaluieren
+        uh_vals = uh.evaluate(intrule.nodes, trafo)
+        uex_vals = uex.evaluate(intrule.nodes, trafo)
+        
+        # 2. Gradienten evaluieren (für Wiggle-Check entscheidend)
+        # Wir brauchen grad(uh - uex) in Welt-Koordinaten
+        duh_phys = uh.evaluate(intrule.nodes, trafo, deriv=True)
+        duex_phys = uex.evaluate(intrule.nodes, trafo, deriv=True)
+        diff_grad = duh_phys - duex_phys # Shape: (n_points, dim)
+        
+        # 3. Wind evaluieren
+        w_vec = wind_coeff.evaluate(intrule.nodes, trafo) # (n_points, dim)
+        
+        # 4. Streamline-Fehler: |w · grad(uh - uex)|^2
+        # Das misst Oszillationen entlang der Strömung
+        streamline_diff = np.einsum("nd,nd->n", w_vec, diff_grad)**2
+        
+        # 5. Geometrie
+        F = trafo.jacobian(intrule.nodes)
+        detF = np.array([abs(np.linalg.det(F[i,:,:])) for i in range(F.shape[0])])
+        quad_weight = detF * intrule.weights
+        
+        # Integrale aufsummieren
+        sum_l2 += np.dot(quad_weight, (uh_vals - uex_vals)**2)
+        sum_streamline += np.dot(quad_weight, streamline_diff)
+        
+    return {
+        "L2_Error": np.sqrt(sum_l2),
+        "Streamline_Grad_Error": np.sqrt(sum_streamline)
+    }
+
+import numpy as np
+
+def compute_difference_SUPG(uh, uex, mesh, wind_coeff, eps, intorder=5):
+    """
+    Berechnet den Fehler in der Streamline-Seminorm: 
+    sqrt( integral( (w * grad(uh - uex))^2 ) )
+    """
+    sumint = 0
+    h_num = 1e-6  # Schrittweite für numerische Ableitung
+    dim = mesh.dimension
+    
+    for elnr in range(len(mesh.elements())):
+        trafo = mesh.trafo(elnr)
+        intrule = select_integration_rule(intorder, trafo.eltype)
+        ips_ref = intrule.nodes
+        nq = len(ips_ref)
+        
+        # --- 1. Gradient der DISKRETEN Lösung uh (analytisch) ---
+        fe = uh.fes.finite_element(trafo.elnr)
+        dofs = uh.fes.element_dofs(trafo.elnr)
+        
+        # dphi_ref shape: (nq, dim, ndofs) oder (nq, ndofs, dim)
+        dphi_ref = fe.evaluate(ips_ref, deriv=True) 
+        uh_local_coeffs = uh.vector[dofs]
+        
+        # Kontraktion: Wir brauchen (nq, dim)
+        # Falls dphi_ref (nq, dim, ndofs) ist:
+        duh_ref = np.einsum("qdj, j -> qd", dphi_ref, uh_local_coeffs)
+        
+        # Transformation in Welt-Raum
+        F = trafo.jacobian(ips_ref)
+        invF = np.array([np.linalg.inv(F[q].T) for q in range(nq)])
+        duh_phys = np.einsum("qij, qj -> qi", invF, duh_ref)
+
+        # --- 2. Gradient der EXAKTEN Lösung uex (numerisch & sicher) ---
+        phys_pts = trafo(ips_ref) 
+        duex_phys = np.zeros((nq, dim))
+        
+        for q in range(nq):
+            point = phys_pts[q]
+            for d in range(dim):
+                shift = np.zeros(dim)
+                shift[d] = h_num
+                
+                # Expliziter Einzelpunkt-Aufruf um Broadcast-Fehler zu vermeiden
+                f_plus = uex.f(point + shift)
+                f_minus = uex.f(point - shift)
+                
+                # Sicherstellen, dass wir Skalare bekommen
+                val_p = f_plus[0] if isinstance(f_plus, (np.ndarray, list)) else f_plus
+                val_m = f_minus[0] if isinstance(f_minus, (np.ndarray, list)) else f_minus
+                
+                duex_phys[q, d] = (val_p - val_m) / (2 * h_num)
+
+        # --- 3. Integration ---
+        w_val = wind_coeff.evaluate(ips_ref, trafo)
+        diff_grad = duh_phys - duex_phys
+        
+        # Richtungsableitung: w · grad(e)
+        res = np.einsum("nd, nd -> n", w_val, diff_grad)
+        
+        # Determinante für das Integral
+        adetF = np.array([abs(np.linalg.det(F[q])) for q in range(nq)])
+        
+        sumint += np.dot(adetF * intrule.weights, res**2)
+        
+    return np.sqrt(sumint)

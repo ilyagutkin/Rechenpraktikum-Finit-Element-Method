@@ -123,9 +123,19 @@ class FEFunction(MeshFunction):
     def _set(self, f , boundary=False,bndry=None):
         """
         Sets the values of the finite element function to f.
+        Automatically detects P1 or P2 elements and calls the appropriate method.
         """
-        if str(self.fes.fe) not in ["P1 Triangle Finite Element","P1 Tesserakt Finite Element","P1 4D-Simplex Finite Element"]:
-            raise Exception("Only P1 triangle finite element,P1 Tesserakt Finite Element,P1 4D-Simplex Finite Element is supported")
+        fe_str = str(self.fes.fe)
+        
+        # Check if it's a P2 element
+        if "P2" in fe_str:
+            self._set_P2(f, boundary=boundary, bndry=bndry)
+            return
+        
+        # For P1 elements
+        if fe_str not in ["P1 Triangle Finite Element","P1 Tesserakt Finite Element","P1 4D-Simplex Finite Element"]:
+            raise Exception("Only P1 and P2 elements are supported")
+        
         if boundary:
             for dof in self.mesh.bndry_vertices:
                 x = self.mesh.points[dof]
@@ -165,6 +175,7 @@ class FEFunction(MeshFunction):
 
         if bndry is not None:
             bset = set(bndry)
+            edge = self.mesh.edge_to_index
 
             for v in bndry:
                 if v < nv:   
@@ -217,7 +228,7 @@ class ConstantVectorFunction(VectorFunction):
     def __init__(self, vec, mesh=None):
         self.mesh = mesh
         self.vec = np.array(vec)
-        self.value_shape = self.vec.shape  # wichtig für evaluate_array
+        self.value_shape = self.vec.shape  # important for evaluate_array
 
     def _evaluate(self, ip, trafo):
         """Return the constant vector value for any input point."""
@@ -300,7 +311,7 @@ class FEVectorFunction(FEFunction):
                 
                 V = self.fes.spaces[b] #local Space
 
-                u_loc = FEFunction(V) # local FE-Funktion
+                u_loc = FEFunction(V) # local FE-Function
                 if isinstance(fb,tuple):
                     func, bndry = fb
                     u_loc._set(func, bndry=bndry)
@@ -325,7 +336,7 @@ class FEVectorFunction(FEFunction):
                 
                 V = self.fes.spaces[b] #local Space
 
-                u_loc = FEFunction(V) # local FE-Funktion
+                u_loc = FEFunction(V) # local FE-Function
                 if isinstance(fb,tuple):
                     func, bndry = fb
                     u_loc._set_P2(func, bndry=bndry)

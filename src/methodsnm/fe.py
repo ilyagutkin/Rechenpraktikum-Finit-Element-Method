@@ -84,13 +84,33 @@ class FE(ABC):
         """
         raise Exception("Not implemented - Base class should not be used")
 
-    def evaluate(self, ip, deriv=False, direction =None):
+    def _evaluate_laplace_array(self, ips):
+        """
+        Evaluates the Laplacian of finite element at multiple integration points at once.
+        Base class implementation is a simple loop over the integration points.
+        Performance gains can only be obtained by overwriting this method.
+
+        Parameters:
+        ips (numpy.array): The integration points at which to evaluate the finite element.
+
+        Returns:
+        numpy.ndarray: The values of the Laplacian of the finite element at the given integration points.
+                       shape: (len(ips), ndof)
+        """
+        ret = np.empty((len(ips), self.ndof))
+        for i in range(len(ips)):
+            ret[i,:] = self._evaluate_laplace(ips[i])
+        return ret
+
+    def evaluate(self, ip, deriv=False, direction =None, laplace=False):
         """
         Evaluates the (derivative of) finite element at given integration point(s).
 
         Parameters:
         ip (numpy.array): The integration point(s) at which to evaluate the finite element.
         deriv (bool): Whether to evaluate the derivative of the finite element (or identity).
+        direction (int, optional): Direction index for derivative evaluation.
+        laplace (bool): Whether to evaluate the Laplacian (sum of second derivatives) of the finite element.
 
         Returns:
         numpy.array: The values of the finite element basis fcts. at the given integration point.
@@ -98,17 +118,23 @@ class FE(ABC):
                   or          (dim, ndof) (for single ip and deriv = True)
                   or (len(ip),      ndof) (for multiple ips)
                   or (len(ip), dim, ndof) (for multiple ips and deriv = True)
+                  or          (ndof) (for single ip and laplace = True)
+                  or (len(ip), ndof) (for multiple ips and laplace = True)
         """
         if isinstance(ip, np.ndarray):
             if ip.ndim == 1:
-                if deriv:
+                if laplace:
+                    return self._evaluate_laplace(ip)
+                elif deriv:
                     if direction is not None:
                         return self._evaluate_deriv(ip)[direction]
                     return self._evaluate_deriv(ip)
                 else:
                     return self._evaluate_id(ip)
             else:
-                if deriv:
+                if laplace:
+                    return self._evaluate_laplace_array(ip)
+                elif deriv:
                     if direction is not None:
                         return self._evaluate_deriv_array(ip,direction)
                     return self._evaluate_deriv_array(ip)

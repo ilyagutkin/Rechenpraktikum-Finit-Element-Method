@@ -1,0 +1,28 @@
+P1-P1 Oseen equation
+
+Results for nu = 1:
+L2 difference u1: 0.10050989076718818
+L2 difference u2: 0.04737149613130813
+L2 difference u3: 0.05087755671877296
+L2 difference p: 0.04915737873147642
+846  free dofs,  282  boundary dofs,  1692  total dofs
+
+Results for nu = 1e-05:
+L2 difference u1: 0.6563108836564707
+L2 difference u2: 0.6913804459492531
+L2 difference u3: 0.5207432893660803
+L2 difference p: 0.13738264184871368
+846  free dofs,  282  boundary dofs,  1692  total dofs
+
+Results for nu = 1e-06:
+L2 difference u1: 0.6479198704589342
+L2 difference u2: 0.682297274825142
+L2 difference u3: 0.5148115456744854
+L2 difference p: 0.1341780010248135
+846  free dofs,  282  boundary dofs,  1692  total dofs
+
+Results for nu = 1e-07:
+L2 difference u1: 0.6471203100856516
+L2 difference u2: 0.6814315984526739
+L2 difference u3: 0.5142603286950292
+L2 difference p: 0.13387549176477154

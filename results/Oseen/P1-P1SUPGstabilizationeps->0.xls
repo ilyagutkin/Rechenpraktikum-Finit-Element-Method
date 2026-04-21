@@ -1,0 +1,28 @@
+P1-P1 +SUPG 
+
+Results for nu = 1:
+L2 difference u1: 0.12026893149337443
+L2 difference u2: 0.060161418199535154
+L2 difference u3: 0.06420588536139374
+L2 difference p: 0.13187629747222177
+846  free dofs,  282  boundary dofs,  1692  total dofs
+
+Results for nu = 1e-05:
+L2 difference u1: 0.10418531410471153
+L2 difference u2: 0.04839712457396048
+L2 difference u3: 0.05214460831661705
+L2 difference p: 0.050942623557096355
+846  free dofs,  282  boundary dofs,  1692  total dofs
+
+Results for nu = 1e-06:
+L2 difference u1: 0.10418618130558258
+L2 difference u2: 0.04839742094169815
+L2 difference u3: 0.052144976413943216
+L2 difference p: 0.050942591216046586
+846  free dofs,  282  boundary dofs,  1692  total dofs
+
+Results for nu = 1e-07:
+L2 difference u1: 0.10418626803741331
+L2 difference u2: 0.04839745058241139
+L2 difference u3: 0.052145013230006886
+L2 difference p: 0.05094258798399132

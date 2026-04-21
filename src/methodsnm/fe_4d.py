@@ -289,6 +289,40 @@ class P2_Hypertriangle_FE(TriangleFE, Lagrange_FE):
             grads[:, 5 + k] = 4.0 * (lamb[j] * grad_lamb[i] + lamb[i] * grad_lamb[j])
 
         return grads
+    
+    def _evaluate_laplace(self, ip):
+        """
+        Compute the reference-Laplacian (sum of second ξ-derivatives)
+        of all 15 P2 shape functions at point ip.
+        Output: array shape (15,)
+        """
+        x0, x1, x2, x3 = ip
+
+        lamb = np.array([1 - x0 - x1 - x2 - x3,
+                        x0, x1, x2, x3])
+
+        grad_lamb = np.array([
+            [-1.0, -1.0, -1.0, -1.0],
+            [ 1.0,  0.0,  0.0,  0.0],
+            [ 0.0,  1.0,  0.0,  0.0],
+            [ 0.0,  0.0,  1.0,  0.0],
+            [ 0.0,  0.0,  0.0,  1.0],
+        ])
+
+        lap = np.zeros(self.ndof)
+
+        # vertex dofs φ_i = 2λ_i^2 - λ_i
+        for i in range(5):
+            # Δ φ_i = 4 * ||grad λ_i||^2
+            lap[i] = 4.0 * np.dot(grad_lamb[i], grad_lamb[i])
+
+        # edge dofs φ_ij = 4 λ_i λ_j
+        for k, (i, j) in enumerate(self.edge_pairs):
+            # Δ φ_ij = 4 * 2 * (grad λ_i · grad λ_j)
+            lap[5 + k] = 8.0 * np.dot(grad_lamb[i], grad_lamb[j])
+
+        return lap
+
 
     def __str__(self):
         return "P2 4D-Simplex Finite Element"

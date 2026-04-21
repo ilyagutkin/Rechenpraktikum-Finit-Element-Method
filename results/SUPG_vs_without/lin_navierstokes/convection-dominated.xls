@@ -1,0 +1,90 @@
+L2 error for eps = 10**-7  for linearised_Navier_Stokes P2-P1 without SUPG
+
+matilda@matilda-Lenovo-V155-15API:~/Bachelorarbeit/methodsnmbetter$ /bin/python3 /home/matilda/Bachelorarbeit/methodsnmbetter/demos/linearised_Navier_Stokes/SUPG_P2-P1.py
+source module for methodsNM imported.
+L2 difference u1: 162.2262554071878
+L2 difference u2: 163.81113416184797
+L2 difference u3: 161.76944635604556
+
+L2 error for eps = 1
+matilda@matilda-Lenovo-V155-15API:~/Bachelorarbeit/methodsnmbetter$ /bin/python3 /home/matilda/Bachelorarbeit/methodsnmbetter/demos/linearised_Navier_Stokes/SUPG_P2-P1.py
+source module for methodsNM imported.
+L2 difference u1: 0.24787232704026013
+L2 difference u2: 0.13995132726030504
+L2 difference u3: 0.127891333425525
+
+L2 error withou supg foe eps in [1 , 0.1 , 0.01 , 0.001,0.0001]
+source module for methodsNM imported.
+L2 difference u1: 0.24787232704026013
+L2 difference u2: 0.13995132726030504
+L2 difference u3: 0.127891333425525
+
+L2 difference u1: 1.0943093749040613
+L2 difference u2: 0.4707877751378204
+L2 difference u3: 0.5957335008336373
+
+L2 difference u1: 4.145227293596075
+L2 difference u2: 2.952687249177743
+L2 difference u3: 2.922909327982192
+
+L2 difference u1: 4.388793646895054
+L2 difference u2: 3.172453488723737
+L2 difference u3: 1.7393829282308704
+
+L2 difference u1: 6.22913152937781
+L2 difference u2: 9.774370647942542
+L2 difference u3: 5.204890052464381
+
+matilda@matilda-Lenovo-V155-15API:~/Bachelorarbeit/methodsnmbetter$ /bin/python3 /home/matilda/Bachelorarbeit/methodsnmbetter/demos/linearised_Navier_Stokes/SUPG_P2-P1.py
+source module for methodsNM imported.
+L2 difference u1: 0.2569593592376158
+L2 difference u2: 0.14482965959618874
+L2 difference u3: 0.13557921555898045
+
+L2 difference u1: 0.2694344368193997
+L2 difference u2: 0.15491228675764337
+L2 difference u3: 0.14446319805776706
+
+L2 difference u1: 0.32093998564634163
+L2 difference u2: 0.1952922853518276
+L2 difference u3: 0.1867085919240499
+
+L2 difference u1: 0.3456029213371499
+L2 difference u2: 0.20812220811729826
+L2 difference u3: 0.20713447131080417
+
+L2 difference u1: 0.34845805527715823
+L2 difference u2: 0.20957702460703276
+L2 difference u3: 0.20969679357432666
+
+epsilon [1,0.0001] meshsize T=4 , 0.25=h
+L2 difference u1: 0.11114476520108153
+L2 difference u2: 0.07734164358689717
+L2 difference u3: 0.07846921889677747
+L2 difference p: 1.4688941128922743
+
+L2 difference u1: 0.12987334957421762
+L2 difference u2: 0.11432915847819781
+L2 difference u3: 0.11336663031317865
+L2 difference p: 0.25120011885835886
+
+with pressure L2 difference u1: 0.2569593592376158
+L2 difference u2: 0.14482965959618874
+L2 difference u3: 0.13557921555898045
+L2 difference p: 0.8155372779300889
+L2 difference u1: 0.2694344368193997
+L2 difference u2: 0.15491228675764337
+L2 difference u3: 0.14446319805776706
+L2 difference p: 0.40986712811464293
+L2 difference u1: 0.32093998564634163
+L2 difference u2: 0.1952922853518276
+L2 difference u3: 0.1867085919240499
+L2 difference p: 0.24378310218448468
+L2 difference u1: 0.3456029213371499
+L2 difference u2: 0.20812220811729826
+L2 difference u3: 0.20713447131080417
+L2 difference p: 0.25814770801505255
+L2 difference u1: 0.34845805527715823
+L2 difference u2: 0.20957702460703276
+L2 difference u3: 0.20969679357432666
+L2 difference p: 0.2601185050436609

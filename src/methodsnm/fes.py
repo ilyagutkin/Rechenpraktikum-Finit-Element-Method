@@ -378,6 +378,7 @@ class P2_Triangle_Space(FESpace):
         self.mesh = mesh
         self.fe = P2_Triangle_FE()
         self.sfe = Lagrange_Segment_FE(order=2)
+        self.dof = list(range(self.ndof))
 
     def _finite_element(self, elnr):
         """Return the quadratic triangle FE template (P2)."""
@@ -590,7 +591,9 @@ class P2_Hypertriangle_Space(FESpace):
             Sorted list of corresponding vertex and edge DOF indices.
         """
         v = sorted(vset)
-        e = self._edge_boundary_dofs(vset)
-        return sorted(v + e)
-
-
+        boundary_edge_list = []
+        for edge, edge_id in self.mesh.boundary_edges.items():
+            if edge[0] in vset and edge[1] in vset:
+                # kantennummer hinzufügen zu einer Liste
+                boundary_edge_list.append(edge_id)
+        return sorted(v + boundary_edge_list)
