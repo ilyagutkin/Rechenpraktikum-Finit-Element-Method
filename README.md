@@ -105,7 +105,7 @@ Only two lecture files were rewritten substantially:
 - the [**4D mesh construction lecture**](/lectures/4d_mesh_construction.ipynb), and  
 - the [**Introduction to FEM**](/lectures/intro_fem.ipynb/),
 
-both of which are based on my own Bachelor’s thesis (/Bachelorarbeit_Ilya_Gutkin.pdf/).
+both of which are based on my own [Bachelor’s](/Bachelorarbeit_Ilya_Gutkin.pdf/) thesis .
 
 The stabilized SUPG term used in this project follows the formulations presented in:
 
